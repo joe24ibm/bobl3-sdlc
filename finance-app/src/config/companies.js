@@ -7,6 +7,9 @@ export const COMPANIES = [
   { symbol: 'CRM', name: 'Salesforce', color: '#b28600' },
 ];
 
+// Line color for a user-chosen company that is not one of the tracked ones.
+export const SELECTED_COMPANY_COLOR = '#ee5396';
+
 // The company the dashboard is about; the others are its competitors.
 export const FOCUS_SYMBOL = 'IBM';
 

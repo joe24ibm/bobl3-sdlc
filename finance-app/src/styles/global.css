@@ -60,3 +60,33 @@ body {
   .chart-grid.even { grid-template-columns: 1fr 1fr; }
   .chart-grid.wide-left { grid-template-columns: 2fr 1fr; }
 }
+
+.symbol-picker { display: flex; flex-direction: column; gap: 8px; margin-top: 8px; }
+.symbol-picker label { font-weight: 600; }
+.symbol-picker-row { display: flex; flex-wrap: wrap; gap: 8px; }
+.symbol-picker input {
+  flex: 1 1 200px;
+  padding: 8px 12px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  font: inherit;
+  text-transform: uppercase;
+}
+.symbol-picker input[aria-invalid='true'] { border-color: var(--down); }
+.symbol-picker button {
+  padding: 8px 16px;
+  border: 1px solid var(--accent);
+  background: var(--accent);
+  color: #fff;
+  border-radius: 4px;
+  cursor: pointer;
+}
+.symbol-picker button.secondary { background: var(--surface); color: var(--accent); }
+.symbol-picker .error { margin: 0; }
+
+.selected-company { display: grid; gap: 16px; grid-template-columns: 1fr; }
+.selected-company > * { min-width: 0; }
+@media (min-width: 900px) {
+  .selected-company { grid-template-columns: 240px 1fr; align-items: start; }
+}
+.no-data { margin: 0; padding: 12px; background: var(--bg); border-radius: 4px; color: var(--text); }

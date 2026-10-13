@@ -41,16 +41,32 @@ export async function fetchQuotes(symbols) {
   return quotes.map(mapQuote).filter(Boolean);
 }
 
+/** The symbol is well-formed but Yahoo has no data for it. The API maps this to HTTP 404. */
+export class NoDataError extends Error {
+  constructor(symbol) {
+    super(`No data available for ${symbol}`);
+    this.name = 'NoDataError';
+    this.code = 'NO_DATA';
+  }
+}
+
 export async function fetchHistory(symbol, rangeKey) {
   const range = RANGES[rangeKey];
   if (!range) throw new Error(`Unknown range: ${rangeKey}`);
 
-  const result = await getClient().chart(symbol, {
-    period1: new Date(Date.now() - range.lookbackDays * 24 * 3600 * 1000),
-    interval: range.interval,
-    includePrePost: false, // regular trading hours only
-  });
+  let result;
+  try {
+    result = await getClient().chart(symbol, {
+      period1: new Date(Date.now() - range.lookbackDays * 24 * 3600 * 1000),
+      interval: range.interval,
+      includePrePost: false, // regular trading hours only
+    });
+  } catch (err) {
+    // Yahoo reports unknown or delisted symbols as a generic Error with this message.
+    if (/no data found/i.test(err?.message ?? '')) throw new NoDataError(symbol);
+    throw err;
+  }
   const points = mapChart(result, range);
-  if (points.length === 0) throw new Error(`No data available for ${symbol}`);
+  if (points.length === 0) throw new NoDataError(symbol);
   return points;
 }
