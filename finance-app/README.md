@@ -27,7 +27,7 @@ npm run check
 It runs lint, then tests, then the build, and stops at the first failure. Each check can also be run on its own:
 
 - `npm run lint` runs ESLint (React and hooks rules).
-- `npm test` runs Vitest (40 tests, no network access).
+- `npm test` runs Vitest (68 tests, no network access).
 - `npm run test:watch` re-runs the tests while you edit.
 - `npm run build` builds into `dist/`.
 
@@ -38,14 +38,17 @@ and breaks the command.
 |---|---|
 | `src/services/financeService.test.js` | Quote and history normalization, % change, ranking, gaps and failures, fallback when a company fails |
 | `src/utils/format.test.js` | Price, percent and market-time formatting |
-| `server/server.test.js` | Yahoo response mapping, request validation, caching, error codes |
+| `server/server.test.js` | Yahoo response mapping, request validation, caching, error codes, 404 for no data |
+| `src/utils/symbols.test.js` | Ticker input normalization and validation |
 | `src/components/cards/StatCard.test.jsx` | Card rendering |
-| `src/pages/DashboardPage.test.jsx` | Dashboard UI: loading, quotes and charts, tab switching, stat cards, error states |
+| `src/components/common/SymbolPicker.test.jsx` | Ticker form: validation messages, submit, clear |
+| `src/pages/dashboard/SelectedCompanyView.test.jsx` | Selected-company graph: loading, data, no-data message, other errors, range change |
+| `src/pages/DashboardPage.test.jsx` | Dashboard UI: loading, quotes and charts, tab switching, stat cards, error states, selected-company flow |
 
 **Success looks like:**
 
 - `npm run lint` prints no errors or warnings.
-- `npm test` ends with `Test Files 5 passed (5)` and `Tests 40 passed (40)`.
+- `npm test` ends with `Test Files 8 passed (8)` and `Tests 68 passed (68)`.
 - `npm run build` ends with `built in ...`. A "chunks larger than 500 kB" notice is expected (the charting library) and is not a failure.
 - `npm run check` exits with code 0 (`echo $?` prints `0`).
 
@@ -63,6 +66,29 @@ The range tabs switch between three views (`src/pages/dashboard/`):
 | Last quarter | `ComparisonView` | Same layout over the quarter |
 
 The focus company (IBM) is set by `FOCUS_SYMBOL` in `src/config/companies.js`.
+
+## Check another company
+
+Below the dashboard, a ticker box lets the user chart any company (for example `AAPL`, `BRK-B`, `^GSPC`):
+
+- The input is trimmed and upper-cased, and checked before anything is fetched. Empty or malformed
+  input shows a message under the box.
+- A valid ticker adds a quote card and a % change graph for that company under the existing views. It
+  follows the selected range tab (current day, 7 days, quarter).
+- While loading, the card shows "Loading…".
+- If the symbol has no data (unknown, delisted), the card says "No data available for XYZ. Check the
+  ticker symbol and try another one." No other company's data is shown in its place.
+- Any other failure (network, Yahoo rate limit) shows the error text instead, so it is not mistaken for
+  a missing symbol.
+- Submit another ticker to replace the graph, or use "Clear" to remove it.
+
+The existing IBM-versus-competitors views do not know about this feature: they use the same code and
+data calls as before. The data comes from `getCompanySnapshot(symbol, rangeKey)` in
+`src/services/financeService.js`, which fetches only that symbol. The server answers a symbol with no
+data with HTTP 404 and code `NO_DATA`.
+
+With `VITE_USE_MOCK=true`, only the tracked companies plus AAPL, GOOGL, AMZN and NVDA have data; any
+other symbol shows the no-data message.
 
 ## Layout
 

@@ -1,6 +1,7 @@
 import { describe, it, expect, vi } from 'vitest';
 import * as mock from './providers/mockProvider.js';
 import * as provider from './providers/index.js';
+import { NoDataError } from './errors.js';
 import {
   normalizeQuotes,
   normalizeHistory,
@@ -8,6 +9,7 @@ import {
   getQuotes,
   getHistory,
   getComparisonSeries,
+  getCompanySnapshot,
   summarizeSeries,
   rankByChange,
 } from './financeService.js';
@@ -147,5 +149,47 @@ describe('service with mock provider', () => {
     provider.fetchHistory.mockRejectedValue(new Error('upstream down'));
     await expect(getComparisonSeries('7D', ['IBM', 'MSFT'])).rejects.toThrow('upstream down');
     provider.fetchHistory.mockImplementation(mock.fetchHistory);
+  });
+});
+
+describe('getCompanySnapshot (user-selected company)', () => {
+  it('returns the quote and a series that contains only the requested symbol', async () => {
+    const { quote, rows } = await getCompanySnapshot('AAPL', '7D');
+    expect(quote).toMatchObject({ symbol: 'AAPL', name: 'AAPL', color: '#ee5396' });
+    expect(rows).toHaveLength(7);
+    expect(Object.keys(rows[0])).toEqual(['date', 'AAPL']);
+    expect(rows[0].AAPL).toBe(0);
+  });
+
+  it('keeps the name and color of a tracked company', async () => {
+    const { quote } = await getCompanySnapshot('IBM', '7D');
+    expect(quote).toMatchObject({ name: 'IBM', color: '#0f62fe' });
+  });
+
+  it('throws NoDataError for an unknown symbol and never substitutes another company', async () => {
+    provider.fetchQuotes.mockClear();
+    provider.fetchHistory.mockClear();
+
+    await expect(getCompanySnapshot('ZZZZ', '7D')).rejects.toBeInstanceOf(NoDataError);
+
+    for (const [symbols] of provider.fetchQuotes.mock.calls) expect(symbols).toEqual(['ZZZZ']);
+    for (const [symbol] of provider.fetchHistory.mock.calls) expect(symbol).toBe('ZZZZ');
+  });
+
+  it('throws NoDataError when history exists but the quote is missing', async () => {
+    provider.fetchQuotes.mockResolvedValueOnce([]);
+    await expect(getCompanySnapshot('AAPL', '7D')).rejects.toMatchObject({ code: 'NO_DATA' });
+  });
+
+  it('throws NoDataError when the quote exists but history is empty', async () => {
+    provider.fetchHistory.mockResolvedValueOnce([]);
+    await expect(getCompanySnapshot('AAPL', '7D')).rejects.toMatchObject({ code: 'NO_DATA' });
+  });
+
+  it('rethrows other failures unchanged so they are not shown as "no data"', async () => {
+    provider.fetchHistory.mockRejectedValueOnce(new Error('rate limited'));
+    const error = await getCompanySnapshot('AAPL', '7D').catch((e) => e);
+    expect(error.message).toBe('rate limited');
+    expect(error.code).toBeUndefined();
   });
 });

@@ -1,5 +1,5 @@
 import { describe, it, expect, vi } from 'vitest';
-import { mapChart, mapQuote } from './yahooClient.js';
+import { mapChart, mapQuote, NoDataError } from './yahooClient.js';
 import { createApiMiddleware } from './apiMiddleware.js';
 import { RANGES } from './ranges.js';
 import { TIME_RANGES } from '../src/config/companies.js';
@@ -117,5 +117,36 @@ describe('createApiMiddleware', () => {
 
   it('returns 404 for unknown API endpoints', async () => {
     expect((await call(createApiMiddleware(makeClient()), '/api/nope')).status).toBe(404);
+  });
+});
+
+describe('no-data handling', () => {
+  function call(middleware, url) {
+    return new Promise((resolve) => {
+      const res = {
+        setHeader() {},
+        end(body) { resolve({ status: this.statusCode, body: JSON.parse(body) }); },
+      };
+      middleware({ url }, res, () => resolve({ status: 'next' }));
+    });
+  }
+
+  it('maps a NO_DATA error to 404 with a NO_DATA code, not a generic 502', async () => {
+    const client = {
+      fetchQuotes: vi.fn(),
+      fetchHistory: vi.fn(async () => {
+        throw new NoDataError('ZZZZ');
+      }),
+    };
+    const { status, body } = await call(createApiMiddleware(client), '/api/history?symbol=ZZZZ&range=7D');
+    expect(status).toBe(404);
+    expect(body.error).toEqual({ code: 'NO_DATA', message: 'No data available for ZZZZ' });
+  });
+
+  it('returns an empty list from /api/quotes for an unknown symbol', async () => {
+    const client = { fetchQuotes: vi.fn(async () => []), fetchHistory: vi.fn() };
+    const { status, body } = await call(createApiMiddleware(client), '/api/quotes?symbols=ZZZZ');
+    expect(status).toBe(200);
+    expect(body).toEqual([]);
   });
 });

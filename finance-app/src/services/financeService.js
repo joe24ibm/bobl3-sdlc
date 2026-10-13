@@ -1,4 +1,5 @@
-import { COMPANIES } from '../config/companies.js';
+import { COMPANIES, SELECTED_COMPANY_COLOR } from '../config/companies.js';
+import { NoDataError } from './errors.js';
 import * as provider from './providers/index.js';
 
 // Public data API used by hooks/components. UI code must only import from here.
@@ -84,6 +85,27 @@ export async function getQuotes(symbols = defaultSymbols()) {
 /** Normalized absolute-price history for one symbol: [{ date, close }]. */
 export async function getHistory(symbol, rangeKey) {
   return normalizeHistory(await provider.fetchHistory(symbol, rangeKey));
+}
+
+/**
+ * Data for one user-chosen company: its quote and its % change series for the range.
+ * Strictly that symbol: if the source has no quote or no history for it, this throws
+ * NoDataError. It never substitutes another company's data. Other failures (network,
+ * rate limit) are rethrown as they are.
+ * Result: { quote, rows } where rows look like [{ date, <SYMBOL>: 0, ... }].
+ */
+export async function getCompanySnapshot(symbol, rangeKey) {
+  const [rawQuotes, history] = await Promise.all([
+    provider.fetchQuotes([symbol]),
+    getHistory(symbol, rangeKey),
+  ]);
+  const [quote] = normalizeQuotes(rawQuotes);
+  if (!quote || history.length === 0) throw new NoDataError(`No data available for ${symbol}`);
+
+  return {
+    quote: { ...quote, color: quote.color ?? SELECTED_COMPANY_COLOR },
+    rows: buildComparisonSeries({ [symbol]: history }),
+  };
 }
 
 /**

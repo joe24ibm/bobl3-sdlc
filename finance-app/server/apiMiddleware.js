@@ -67,6 +67,7 @@ export function createApiMiddleware(client, { ttlMs = 60_000, now = Date.now } =
       send(200, await pending);
     } catch (err) {
       if (err instanceof HttpError) return send(err.status, { error: { code: err.code, message: err.message } });
+      if (err.code === 'NO_DATA') return send(404, { error: { code: 'NO_DATA', message: err.message } });
       send(502, { error: { code: 'UPSTREAM_ERROR', message: err.message || 'Market data provider failed' } });
     }
   };
